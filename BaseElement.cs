@@ -2,7 +2,7 @@ using System.Drawing;
 
 internal abstract class BaseElement
 {
-    public string Output { get; protected set; }
+    public string Output { get; set; }
     public Color Forecolor { get; protected set; }
     public Color Backcolor { get; protected set; }
     public bool IsPassable { get; protected set; }
