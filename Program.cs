@@ -6,6 +6,8 @@ internal class Program
         map.Init();
         map.Print();
 
+        List<int> playerLevelsHistory = new List<int>(); // Initialize the list to store player levels
+
         while (true)
         {
             ConsoleKeyInfo key = Console.ReadKey();
