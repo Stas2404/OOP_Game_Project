@@ -4,12 +4,21 @@ internal class Player : BaseElement
 {
     public int X { get; private set; }
     public int Y { get; private set; }
+    public int Level { get; set; } = 1;
+    public List<int> LevelsHistory { get; private set; } = new List<int>();
 
     public Player(int x, int y) : base("P", Color.Green, Color.Black, true)
     {
         X = x;
         Y = y;
     }
+
+    public void SetPosition(int x, int y)
+    {
+        X = x;
+        Y = y;
+    }
+
 
     public void Move(int dx, int dy, int width, int height, BaseElement[,] field)
     {
@@ -22,13 +31,18 @@ internal class Player : BaseElement
 
             if (!nextElement.IsPassable)
             {
-                Console.WriteLine("Ви врізалися у стіну!");
                 return;
             }
 
             if (nextElement.Output == "E")
             {
-                Console.WriteLine("Ви натрапили на ворога!");
+                LevelsHistory.Add(Level);
+                Battle battle = new Battle(this, (Element)nextElement, LevelsHistory);
+
+                if (!battle.PlayerWon)
+                {
+                    return; 
+                }
             }
 
             field[Y, X] = new Element("#", Color.White, Color.Black, true);
