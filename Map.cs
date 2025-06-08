@@ -1,147 +1,284 @@
 using System.Drawing;
 using System.IO;
+using System;
+using System.Collections.Generic;
+using System.Threading;
 
-internal class Map
+public class Map
 {
-    const int Width = 10;
-    const int Height = 10;
+    internal const int Width = 10;
+    internal const int Height = 10;
     BaseElement[,] field = new BaseElement[Width, Height];
     public Player player;
-    private List<(int x, int y, string output, Color fg, Color bg, bool isPassable)> initialEnemies
-    = new List<(int, int, string, Color, Color, bool)>();
+    public GameLevel GameLevel { get; private set; } = new GameLevel();
+    public bool IsCustomLevel { get; set; } = false;
+
+    public BaseElement[,] Field => field;
+
+    //public char[] ffield = new char[10];
+    //public char this[int index] 
+    //{
+    //    get 
+    //    {
+    //        return ffield[index];
+    //    }
+    //    set
+    //    {
+    //        ffield[index] = value;
+    //    }
+    //}
+
+    public BaseElement this[int row, int col] //доробити
+    {
+        get 
+        {
+            return field[row, col];
+        }
+        set
+        {
+            field[row, col] = value;
+        }
+    } 
+
 
     public void Init()
     {
-        for (int i = 0; i < Height; i++)
-        {
-            for (int j = 0; j < Width; j++)
-            {
-                field[i, j] = new Element("#", Color.White, Color.Black, true);
-            }
-        }
+        field = new BaseElement[Width, Height];
 
-        player = new Player(0, 0);
+        for (int i = 0; i < Height; i++)
+            for (int j = 0; j < Width; j++)
+                field[i, j] = new EmptyTile();
+
+        player = new Player(0, 0, this);
         field[0, 0] = player;
 
-        CreateElement(5, "W", Color.Blue, Color.Black, false);
-        CreateElement(10, "E", Color.Red, Color.Black, true);
+        for (int i = 0; i < 5; i++)
+        {
+            var pos = GetRandomFreePosition();
+            field[pos.y, pos.x] = new Wall();
+        }
 
+        var range = GameLevel.GetEnemyLevelRange();
+        int totalEnemies = new Random().Next(3, 6);
+        int tankCount = new Random().Next(0, totalEnemies + 1);
 
-        player.LevelsHistory.Add(player.Level);
+        for (int i = 0; i < totalEnemies; i++)
+        {
+            var pos = GetRandomFreePosition();
+            string sym = (i < tankCount) ? "T" : "E";
+            var stats = new EnemyStats(new Random().Next(range.min, range.max + 1), sym == "T");
+            field[pos.y, pos.x] = new Enemy(sym, Color.Red, Color.Black, stats);
+        }
+
+        Random rnd = new Random();
+        if (rnd.NextDouble() < 0.2)
+        {
+            var pos = GetRandomFreePosition();
+            field[pos.y, pos.x] = new LevelUpElement();
+        }
+
+        if (rnd.NextDouble() < 0.2)
+        {
+            var pos = GetRandomFreePosition();
+            field[pos.y, pos.x] = new GambleElement();
+        }
     }
 
-    public void CreateElement(int count, string output, Color foreground, Color background, bool isPassable)
+    private (int x, int y) GetRandomFreePosition()
     {
         Random rnd = new Random();
-        int enemyNumber = rnd.Next(3, 6);
+        int x, y;
 
-        for (int i = 0; i < enemyNumber; i++)
+        do
         {
-            int x, y;
-            do
-            {
-                x = rnd.Next(0, Width);
-                y = rnd.Next(0, Height);
-            } while (!(field[y, x] is Element) || field[y, x].Output != "#" || (x == player.X && y == player.Y));
-
-            field[y, x] = new Element(output, foreground, background, isPassable);
-
-            initialEnemies.Add((x, y, output, foreground, background, isPassable));
+            x = rnd.Next(0, Width);
+            y = rnd.Next(0, Height);
         }
+        while (!(field[y, x] is EmptyTile) || field[y, x].Output != "." || (x == player.X && y == player.Y));
+
+        return (x, y);
     }
 
-
-    public void MovePlayer(int dx, int dy)
+    public void GenerateNextLevel(bool isCustomLevel = false)
     {
-        player.Move(dx, dy, Width, Height, field);
-    }
-
-    public void ResetAfterDefeat()
-    {
-        for (int i = 0; i < Height; i++)
+        if (!HasEnemiesLeft())
         {
-            for (int j = 0; j < Width; j++)
+            if (isCustomLevel)
             {
-                field[i, j] = new Element("#", Color.White, Color.Black, true);
+                Console.WriteLine("You completed the custom level!");
+                Console.WriteLine("Press any button to exit...");
+                Console.ReadKey();
+                Environment.Exit(0);
+            }
+
+            GameLevel.IncreaseLevel();
+
+            field = new BaseElement[Width, Height];
+            for (int i = 0; i < Height; i++)
+                for (int j = 0; j < Width; j++)
+                    field[i, j] = new EmptyTile();
+
+            player.SetPosition(0, 0);
+            field[0, 0] = player;
+
+            Console.WriteLine($"\n--- New game level: {GameLevel.LevelNumber} ---\n");
+            Thread.Sleep(1000);
+
+            if (GameLevel.LevelNumber == 2 || GameLevel.LevelNumber == 4)
+            {
+                field = MazeGenerator.GenerateMaze(Width, Height, player, GameLevel);
+            }
+            else if (GameLevel.LevelNumber == 5)
+            {
+                if (player.Level < 5)
+                {
+                    Console.Clear();
+                    Console.WriteLine("Your level is too low to defeat the boss!");
+                    Console.WriteLine("The game will be restarted...");
+                    Thread.Sleep(3000);
+
+                    GameLevel = new GameLevel();
+                    player.Level = 1;
+                    player.WinsSinceLastLevel = 0;
+
+                    Init();
+                    return;
+                }
+
+                int bossX = Width / 2;
+                int bossY = Height / 2;
+
+                var boss = new Enemy("B", Color.DarkRed, Color.Black, new EnemyStats(25));
+                field[bossY, bossX] = boss;
+            }
+            else
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    var pos = GetRandomFreePosition();
+                    field[pos.y, pos.x] = new Wall();
+                }
+
+                var range = GameLevel.GetEnemyLevelRange();
+                int totalEnemies = new Random().Next(3, 6);
+                int tankCount = new Random().Next(0, totalEnemies + 1);
+
+                for (int i = 0; i < totalEnemies; i++)
+                {
+                    var pos = GetRandomFreePosition();
+                    string sym = (i < tankCount) ? "T" : "E";
+                    var stats = new EnemyStats(new Random().Next(range.min, range.max + 1), sym == "T");
+                    field[pos.y, pos.x] = new Enemy(sym, Color.Red, Color.Black, stats);
+                }
+
+                Random rnd = new Random();
+                if (rnd.NextDouble() < 0.2)
+                {
+                    var pos = GetRandomFreePosition();
+                    field[pos.y, pos.x] = new LevelUpElement();
+                }
+
+                if (rnd.NextDouble() < 0.2)
+                {
+                    var pos = GetRandomFreePosition();
+                    field[pos.y, pos.x] = new GambleElement();
+                }
             }
         }
-
-        player.SetPosition(0, 0);
-        field[0, 0] = player;
-
-        foreach (var (x, y, output, fg, bg, isPassable) in initialEnemies)
-        {
-            field[y, x] = new Element(output, fg, bg, isPassable);
-        }
     }
 
+    public bool HasEnemiesLeft()
+    {
+        foreach (var elem in field)
+        {
+            if (elem.IsEnemy && elem.Output != ".")
+                return true;
+        }
+        return false;
+    }
 
     public void Print()
     {
         for (int i = 0; i < Height; i++)
         {
             for (int j = 0; j < Width; j++)
-            {
                 Console.Write(field[i, j].Output + " ");
-            }
             Console.WriteLine();
         }
+
+        Console.WriteLine($"\nPlayer's level: {player.Level}");
+        Console.WriteLine($"Game level: {GameLevel.LevelNumber}");
     }
 
-    public void SaveGame(string path)
-    {
-        using (StreamWriter writer = new StreamWriter(path))
-        {
-            writer.WriteLine($"{player.X},{player.Y},{player.Level}");
-
-            for (int y = 0; y < Height; y++)
-            {
-                for (int x = 0; x < Width; x++)
-                {
-                    BaseElement elem = field[y, x];
-
-                    if (elem == player || elem.Output == "#")
-                        continue;
-
-                    writer.WriteLine($"{x},{y},{elem.Output},{(int)elem.Forecolor.ToArgb()},{(int)elem.Backcolor.ToArgb()},{elem.IsPassable}");
-                }
-            }
-        }
-    }
-
-    public void LoadGame(string path)
+    public void LoadFromFile(string path)
     {
         if (!File.Exists(path)) return;
 
         var lines = File.ReadAllLines(path);
-
         string[] playerData = lines[0].Split(',');
+
         int playerX = int.Parse(playerData[0]);
         int playerY = int.Parse(playerData[1]);
         int playerLevel = int.Parse(playerData[2]);
+        int winsSinceLastLevel = playerData.Length > 3 ? int.Parse(playerData[3]) : 0;
+        int gameLevel = int.Parse(playerData[4]);
+
+        field = new BaseElement[Width, Height];
 
         for (int i = 0; i < Height; i++)
             for (int j = 0; j < Width; j++)
-                field[i, j] = new Element("#", Color.White, Color.Black, true);
+                field[i, j] = new EmptyTile();
 
-        player.SetPosition(playerX, playerY);
+        player = new Player(playerX, playerY, this);
         player.Level = playerLevel;
+        player.WinsSinceLastLevel = winsSinceLastLevel;
         field[playerY, playerX] = player;
 
-        initialEnemies.Clear();
+        GameLevel = new GameLevel();
+        while (GameLevel.LevelNumber < gameLevel)
+            GameLevel.IncreaseLevel();
 
         for (int i = 1; i < lines.Length; i++)
         {
             string[] parts = lines[i].Split(',');
             int x = int.Parse(parts[0]);
             int y = int.Parse(parts[1]);
-            string output = parts[2];
-            Color fg = Color.FromArgb(int.Parse(parts[3]));
-            Color bg = Color.FromArgb(int.Parse(parts[4]));
-            bool isPassable = bool.Parse(parts[5]);
+            string type = parts[2];
+            string output = parts[3];
+            Color fg = Color.FromArgb(int.Parse(parts[4]));
+            Color bg = Color.FromArgb(int.Parse(parts[5]));
+            bool isPassable = bool.Parse(parts[6]);
 
-            field[y, x] = new Element(output, fg, bg, isPassable);
-            initialEnemies.Add((x, y, output, fg, bg, isPassable));
+            BaseElement elem;
+
+            switch (type)
+            {
+                case "Wall":
+                    elem = new Wall();
+                    break;
+                case "Enemy":
+                    int level = parts.Length > 7 ? int.Parse(parts[7]) : GameLevel.GetEnemyLevelRange().min;
+                    bool isTank = parts.Length > 8 && bool.Parse(parts[8]);
+                    var stats = new EnemyStats(level, isTank);
+                    elem = new Enemy(output, fg, bg, stats);
+                    break;
+                case "LevelUpElement":
+                    elem = new LevelUpElement();
+                    break;
+                case "GambleElement":
+                    elem = new GambleElement();
+                    break;
+                default:
+                    elem = new EmptyTile();
+                    break;
+            }
+
+            field[y, x] = elem;
         }
+    }
+
+    public BaseElement GetElement(int x, int y)
+    {
+        return field[y, x];
     }
 }
