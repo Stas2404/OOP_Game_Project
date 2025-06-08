@@ -15,30 +15,18 @@ public class Map
 
     public BaseElement[,] Field => field;
 
-    //public char[] ffield = new char[10];
-    //public char this[int index] 
+
+    //public BaseElement this[int row, int col] //доробити
     //{
     //    get 
     //    {
-    //        return ffield[index];
+    //        return field[row, col];
     //    }
     //    set
     //    {
-    //        ffield[index] = value;
+    //        field[row, col] = value;
     //    }
-    //}
-
-    public BaseElement this[int row, int col] //доробити
-    {
-        get 
-        {
-            return field[row, col];
-        }
-        set
-        {
-            field[row, col] = value;
-        }
-    } 
+    //} 
 
 
     public void Init()
@@ -106,9 +94,12 @@ public class Map
             if (isCustomLevel)
             {
                 Console.WriteLine("You completed the custom level!");
-                Console.WriteLine("Press any button to exit...");
+                Console.WriteLine("Press any key to return to the main menu...");
                 Console.ReadKey();
-                Environment.Exit(0);
+
+                Game game = new Game();
+                game.Menu();
+                return;
             }
 
             GameLevel.IncreaseLevel();
