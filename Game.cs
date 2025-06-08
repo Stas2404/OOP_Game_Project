@@ -127,6 +127,8 @@ public class Game
 
             case ConsoleKey.Escape:
                 isRunning = false;
+                Game game = new Game();
+                game.Menu();
                 break;
 
         }
