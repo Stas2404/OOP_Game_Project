@@ -55,6 +55,8 @@ public class Player : BaseElement
         SetPosition(newX, newY);
         field[Y, X] = this;
 
+        nextElement.Interact(this);
+
         SoundManager.PlayMoveSound();
 
         if (!map.HasEnemiesLeft())
