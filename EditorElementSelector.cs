@@ -23,7 +23,7 @@ public class EditorElementSelector
         return selectedKey switch
         {
             '1' => new Enemy("E", Color.Red, Color.Black, new EnemyStats(1, false)),  
-            '2' => new Enemy("T", Color.DarkRed, Color.Black, new EnemyStats(1, true))
+            '2' => new Enemy("T", Color.DarkRed, Color.Black, new EnemyStats(1, true)),
             '3' => new Wall(),
             '4' => new LevelUpElement(),
             '5' => new GambleElement(),
