@@ -85,11 +85,14 @@ internal class BattleConsoleUI
             LevelEditor editor = new LevelEditor();
             editor.Start();
             Console.ReadKey();
-            Environment.Exit(0);
+
+            Game game = new Game();
+            game.Menu();
         }
         else
         {
-            Environment.Exit(0);
+            Game game = new Game();
+            game.Menu();
         }
     }
 }
