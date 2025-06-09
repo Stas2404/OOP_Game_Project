@@ -13,20 +13,13 @@ public class Map
     public GameLevel GameLevel { get; private set; } = new GameLevel();
     public bool IsCustomLevel { get; set; } = false;
 
-    public BaseElement[,] Field => field;
 
+    public BaseElement this[int y, int x]
+    {
+        get => field[y, x];
+        set => field[y, x] = value;
+    }
 
-    //public BaseElement this[int row, int col] //доробити
-    //{
-    //    get 
-    //    {
-    //        return field[row, col];
-    //    }
-    //    set
-    //    {
-    //        field[row, col] = value;
-    //    }
-    //} 
 
 
     public void Init()
