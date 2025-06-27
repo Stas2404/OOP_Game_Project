@@ -7,10 +7,6 @@ public class Wall : BaseElement
     {
     }
 
-    public override void Print()
-    {
-        Console.Write(Output);
-    }
     public override void Interact(Player player)
     {
     }
