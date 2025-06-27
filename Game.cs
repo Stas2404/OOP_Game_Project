@@ -9,20 +9,25 @@ public class Game
     private bool isRunning;
     private string savePath;
     private string customPath;
-
     private Dictionary<ConsoleKey, (int dx, int dy)> moveMap;
-
     private bool bossDefeated = false;
     private bool isCustomLevel = false;
 
-    public Game()
+    private readonly IGameUI ui;
+    private readonly object? form;
+
+    public Map CurrentMap => map;
+
+    public Game(IGameUI ui, object? form = null)
     {
-        map = new Map();
+        this.ui = ui;
+        this.form = form;
+
+        map = new Map(ui, this, form);
         isRunning = true;
+
         savePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "save.txt");
         customPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "customlvl.txt");
-
-
 
         moveMap = new Dictionary<ConsoleKey, (int dx, int dy)>
         {
@@ -31,48 +36,56 @@ public class Game
             [ConsoleKey.A] = (-1, 0),
             [ConsoleKey.D] = (1, 0)
         };
+
+        BaseElement.OnMessage -= ui.WriteLine;
+        BaseElement.OnMessage += ui.WriteLine;
     }
 
     public void Init()
     {
         map.Init();
-        map.Print();
     }
 
     public void Run()
     {
         isRunning = true;
+
+        if (form == null)
+            ui.DrawMap(map);
+
         while (isRunning)
         {
-            ConsoleKeyInfo key = Console.ReadKey();
-            Console.Clear();
+            ConsoleKey key = ui.ReadKey();
+            ui.Clear();
 
-            if (moveMap.TryGetValue(key.Key, out var move))
+            if (moveMap.TryGetValue(key, out var move))
             {
                 map.player.MovePlayer(move.dx, move.dy);
             }
             else
             {
-                HandleSpecialKey(key.Key);
+                HandleSpecialKey(key);
             }
 
-            map.Print();
+            if (form == null)
+                ui.DrawMap(map);
 
             if (!map.HasEnemiesLeft())
             {
                 if (isCustomLevel)
                 {
-                    Console.ReadKey();
-                    Environment.Exit(0);
+                    ui.WriteLine("🎉 You completed the custom level!");
+                    isRunning = false;
+                    TryInvokeFormMethod("ReturnToMainMenu");
+                    return;
                 }
-                else
-                {
-                    map.GenerateNextLevel();
-                }
+
+                map.GenerateNextLevel();
+                if (form == null)
+                    ui.DrawMap(map);
             }
         }
     }
-
 
     private void HandleSpecialKey(ConsoleKey key)
     {
@@ -80,13 +93,13 @@ public class Game
         {
             case ConsoleKey.F5:
                 GameSaver.Save(map, savePath);
-                Console.WriteLine("Game saved.");
+                ui.WriteLine("Game saved.");
                 Thread.Sleep(1000);
                 break;
 
             case ConsoleKey.F6:
                 GameSaver.Load(map, savePath);
-                Console.WriteLine("Game loaded.");
+                ui.WriteLine("Game loaded.");
                 Thread.Sleep(1000);
                 break;
 
@@ -94,99 +107,71 @@ public class Game
                 if (map.GameLevel.LevelNumber == 6)
                 {
                     GameSaver.Save(map, customPath);
-                    Console.WriteLine("Custom level saved.");
+                    ui.WriteLine("Custom level saved.");
                 }
                 Thread.Sleep(1000);
                 break;
-
 
             case ConsoleKey.F4:
                 if (bossDefeated)
                 {
                     if (File.Exists(customPath))
                     {
-                        map = new Map();
+                        map = new Map(ui, this, form);
                         GameSaver.Load(map, customPath);
-                        Console.Clear();
-                        Console.WriteLine("Custom level loaded.");
+                        map.IsCustomLevel = true;
+                        isCustomLevel = true;
+                        ui.Clear();
+                        ui.WriteLine("Custom level loaded.");
                         Thread.Sleep(1000);
                         Run();
                     }
                     else
                     {
-                        Console.WriteLine("Custom level file not found.");
+                        ui.WriteLine("Custom level file not found.");
                         Thread.Sleep(1000);
                     }
                 }
                 else
                 {
-                    Console.WriteLine("Defeat the boss to access the custom level!");
+                    ui.WriteLine("Defeat the boss to access the custom level!");
                     Thread.Sleep(1000);
                 }
                 break;
-
-            case ConsoleKey.Escape:
-                isRunning = false;
-                Game game = new Game();
-                game.Menu();
-                break;
-
         }
     }
+
     public void SetBossDefeated()
     {
         bossDefeated = true;
     }
-    public void RunCustomLevel()
+
+    public bool RunCustomLevel()
     {
         if (!File.Exists(customPath))
         {
-            Console.WriteLine("Custom level not found.");
-            Thread.Sleep(1000);
-            return;
+            ui.WriteLine("Custom level not found.");
+            return false;
         }
 
-        map = new Map();
+        map = new Map(ui, this, form);
         map.IsCustomLevel = true;
         GameSaver.Load(map, customPath);
         isCustomLevel = true;
-        Console.Clear();
-        Run();
+        return true;
     }
 
-    public void Menu()
+    private void TryInvokeFormMethod(string methodName, object? parameter = null)
     {
-        while (true)
+        if (form == null) return;
+
+        var method = parameter == null
+            ? form.GetType().GetMethod(methodName)
+            : form.GetType().GetMethod(methodName, new[] { parameter.GetType() });
+
+        if (method != null)
         {
-            Console.Clear();
-            Console.WriteLine("Goblins Dungeon");
-            Console.WriteLine("1. Play");
-            Console.WriteLine("2. Custom Level");
-            Console.WriteLine("3. Exit");
-            Console.Write("\nSelect an option (1-3): ");
-
-            ConsoleKeyInfo key = Console.ReadKey(true);
-            Console.WriteLine(key.KeyChar);
-
-            switch (key.Key)
-            {
-                case ConsoleKey.D1:
-                    Init();
-                    Run();
-                    return;
-                case ConsoleKey.D2:
-                    LevelEditor editor = new LevelEditor();
-                    editor.Start();
-                    return;
-                case ConsoleKey.D3:
-                    Environment.Exit(0);
-                    return;
-                default:
-                    Console.WriteLine("\nInvalid input. Please press 1, 2, or 3.");
-                    Thread.Sleep(1500);
-                    break;
-            }
+            method.Invoke(form, parameter == null ? null : new object[] { parameter });
         }
     }
-
 }
