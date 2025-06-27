@@ -10,11 +10,17 @@ public class Enemy : BaseElement
         EnemyStats = stats;
     }
 
-    public override void Print()
-    {
-        Console.Write(Output);
-    }
     public override void Interact(Player player)
     {
+        Game? game = player.GetGame();
+        object? form = GetFormIfExists(player);
+
+        var battle = new Battle(player, this, game, player.X, player.Y);
+        player.StartBattle(battle);
+    }
+
+    private object? GetFormIfExists(Player player)
+    {
+        return null;
     }
 }
