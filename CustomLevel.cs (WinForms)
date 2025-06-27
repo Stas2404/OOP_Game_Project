@@ -1,0 +1,177 @@
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Drawing.Text;
+
+namespace MenuUI
+{
+    public partial class CustomLvl : Form
+    {
+        private PrivateFontCollection pfc = new PrivateFontCollection();
+
+        private const int Width = 10;
+        private const int Height = 10;
+        private readonly Label[,] labels = new Label[Height, Width];
+        private readonly BaseElement[,] field = new BaseElement[Height, Width];
+        private readonly EditorElementSelector selector = new EditorElementSelector();
+        private readonly string customPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "customlvl.txt");
+        private int currentKeyIndex = 0;
+        private readonly MainMenu mainMenu;
+        private readonly ConsoleKey[] elementKeys = new[]
+        {
+            ConsoleKey.D1, ConsoleKey.D2, ConsoleKey.D3,
+            ConsoleKey.D4, ConsoleKey.D5, ConsoleKey.D6
+        };
+
+        public CustomLvl(MainMenu mainMenu)
+        {
+            InitializeComponent();
+            InitGrid();
+            UpdateSelectedLabel();
+            LoadCustomFont();
+            this.mainMenu = mainMenu;
+            this.KeyPreview = true;
+        }
+
+        private void LoadCustomFont()
+        {
+            string fontPath = Path.Combine(Application.StartupPath, "PressStart2P-Regular.ttf");
+            if (File.Exists(fontPath))
+            {
+                pfc.AddFontFile(fontPath);
+                Font myFont = new Font(pfc.Families[0], 12f); // можеш змінити розмір за бажанням
+                chosenElem.Font = myFont;
+            }
+            else
+            {
+                MessageBox.Show("Шрифт не знайдено за шляхом:\n" + fontPath);
+            }
+        }
+
+        private void InitGrid()
+        {
+            gamePanel.Controls.Clear();
+            gamePanel.Width = Width * 40;
+            gamePanel.Height = Height * 40;
+
+            for (int y = 0; y < Height; y++)
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    var lbl = new Label
+                    {
+                        BorderStyle = BorderStyle.FixedSingle,
+                        Width = 40,
+                        Height = 40,
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        Location = new Point(x * 40, y * 40),
+                        BackColor = Color.Black,
+                        ForeColor = Color.White,
+                        Tag = (x, y),
+                        Text = "."
+                    };
+                    lbl.Click += Cell_Click;
+                    labels[y, x] = lbl;
+                    field[y, x] = new EmptyTile();
+                    gamePanel.Controls.Add(lbl);
+                }
+            }
+
+            field[0, 0] = new Player(0, 0, null, null, null);
+            labels[0, 0].Text = "P";
+            labels[0, 0].ForeColor = Color.Green;
+        }
+
+        private void Cell_Click(object? sender, EventArgs e)
+        {
+            if (sender is not Label lbl) return; 
+
+            var (x, y) = ((int, int))lbl.Tag!;
+
+            if (x == 0 && y == 0) return;
+
+            var element = selector.GetElement(x, y);
+            field[y, x] = element;
+            lbl.Text = element.Output;
+            lbl.ForeColor = element.Forecolor;
+            lbl.BackColor = element.Backcolor;
+        }
+
+        private void BtnElem_Click(object? sender, EventArgs e)
+        {
+            currentKeyIndex = (currentKeyIndex + 1) % elementKeys.Length;
+            selector.UpdateSelected(elementKeys[currentKeyIndex]);
+            UpdateSelectedLabel();
+        }
+
+        private void UpdateSelectedLabel()
+        {
+            chosenElem.Text = "Selected: " + selector.GetSelectedLabel();
+        }
+
+        private void SaveToFile()
+        {
+            using StreamWriter writer = new StreamWriter(customPath);
+            writer.WriteLine("0,0,1,0,1");
+
+            for (int y = 0; y < Height; y++)
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    var elem = field[y, x];
+                    if (elem is Player || elem is EmptyTile) continue;
+
+                    string type = elem switch
+                    {
+                        Enemy => "Enemy",
+                        Wall => "Wall",
+                        LevelUpElement => "LevelUpElement",
+                        GambleElement => "GambleElement",
+                        _ => "Unknown"
+                    };
+
+                    string extra = "";
+                    if (elem is Enemy enemy)
+                        extra = $",{enemy.EnemyStats.Level},{enemy.EnemyStats.IsTank}";
+
+                    writer.WriteLine($"{x},{y},{type},{elem.Output},{(int)elem.Forecolor.ToArgb()},{(int)elem.Backcolor.ToArgb()},{elem.IsPassable}{extra}");
+                }
+            }
+        }
+
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            switch (keyData)
+            {
+                case Keys.F3:
+                    SaveToFile();
+                    MessageBox.Show("✅ Custom level was saved!");
+                    return true;
+
+                case Keys.F4:
+                    var mainForm = new Main(mainMenu)
+                    {
+                        ShouldLoadCustomLevel = true
+                    };
+
+                    mainForm.FormClosed += (s, args) =>
+                    {
+                        if(!mainForm.VictoryExit)
+                        {
+                            this.Show();
+                        }
+                    };
+
+                    this.Hide();
+                    mainForm.Show();
+                    return true;
+
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+    }
+}
