@@ -1,0 +1,47 @@
+using MenuUI;
+using System;
+using System.Windows.Forms;
+
+public class WinFormsGameUI : IGameUI
+{
+    private readonly Main form;
+
+    public WinFormsGameUI(Main form)
+    {
+        this.form = form;
+    }
+
+    public void Write(string text) => form.AppendMessage(text);
+    public void WriteLine(string message)
+    {
+        if (form.InvokeRequired)
+        {
+            form.Invoke(new Action(() => form.AppendMessage(message)));
+        }
+        else
+        {
+            form.AppendMessage(message);
+        }
+    }
+    public void Clear() 
+    {
+        if (form.InvokeRequired)
+        {
+            form.Invoke(new Action(() => form.ClearPanel()));
+        }
+        else
+        {
+            form.ClearPanel();
+        }
+    }
+    public void DrawMap(Map map)
+    {
+        form.Invalidate();
+    }
+
+    public void WaitForKey() { }
+    public ConsoleKey ReadKey() => ConsoleKey.Enter; 
+
+    public void SetColor(ConsoleColor fg, ConsoleColor bg) { }
+    public void ResetColor() { }
+}
