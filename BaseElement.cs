@@ -7,6 +7,7 @@ public abstract class BaseElement
     public Color Backcolor { get; protected set; }
     public bool IsPassable { get; protected set; }
     public bool IsEnemy { get; protected set; }
+    public static event Action<string>? OnMessage;
 
     protected BaseElement(string output, Color forecolor, Color backcolor, bool isPassable, bool isEnemy = false)
     {
@@ -16,8 +17,11 @@ public abstract class BaseElement
         IsPassable = isPassable;
         IsEnemy = isEnemy;
     }
+    protected void RaiseMessage(string message)
+    {
+        OnMessage?.Invoke(message);
+    }
 
-    public abstract void Print();
     public abstract void Interact(Player player);
 
 }
