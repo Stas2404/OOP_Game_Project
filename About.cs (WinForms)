@@ -1,0 +1,47 @@
+using MenuUI;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Drawing.Text;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using static System.Windows.Forms.DataFormats;
+
+namespace MenuUI
+{
+    public partial class About : Form
+    {
+        private PrivateFontCollection pfc = new PrivateFontCollection();
+        private MainMenu mainForm;
+        public About(MainMenu form1)
+        {
+            InitializeComponent();
+            LoadCustomFont();
+            mainForm = form1;
+        }
+        private void LoadCustomFont()
+        {
+            string fontPath = Path.Combine(Application.StartupPath, "PressStart2P-Regular.ttf");
+            if (File.Exists(fontPath))
+            {
+                pfc.AddFontFile(fontPath);
+                Font myFont = new Font(pfc.Families[0], 12f, FontStyle.Regular);
+                label1.Font = myFont;
+            }
+            else
+            {
+                MessageBox.Show("Шрифт не знайдено за шляхом:\n" + fontPath);
+            }
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            mainForm.Show(); 
+            this.Close();
+        }
+    }
+}
