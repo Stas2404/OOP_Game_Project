@@ -1,4 +1,4 @@
-internal class Battle
+public class Battle
 {
     private Player player;
     private Enemy enemy;
@@ -10,21 +10,33 @@ internal class Battle
     private string enemyName;
     private bool isBoss;
     private Game game;
+    private int enemyX;
+    private int enemyY;
 
     private BossAI bossAI;
 
     public bool PlayerWon { get; private set; } = true;
+    public Enemy Enemy { get; private set; }
+
     public bool CanMercy => !isBoss;
+    public string EnemyName => enemyName;
+    public int EnemyLevel => enemyLevel;
+
+
 
     public event Action<string> OnMessage;
     public event Action OnBattleEnd;
     public event Action OnBossDefeated;
 
-    public Battle(Player player, Enemy enemy)
+    public Battle(Player player, Enemy enemy, Game game, int enemyX, int enemyY)
     {
         this.player = player;
         this.enemy = enemy;
         this.game = game;
+        this.enemyX = enemyX;
+        this.enemyY = enemyY;
+
+        SoundManager.PlayBattleMusic();
 
         playerHP = 100 + (player.Level - 1) * 20;
         playerMaxHP = playerHP;
@@ -54,24 +66,22 @@ internal class Battle
             enemyHP = enemyMaxHP;
             enemyName = (enemy.Output == "T") ? "Tank" : "Enemy";
         }
-
-        OnMessage?.Invoke($"\u2694\ufe0f Battle started against {enemyName} (Lv {enemyLevel})!");
     }
 
     public string GetFormattedState()
     {
         string output = "";
-        output += $"P{"".PadRight(39)}{enemy.Output}\n";
-        output += $"Player's Level: {player.Level}".PadRight(40) + $"{enemyName}'s Level: {enemyLevel}\n";
-        output += $"Player's HP: {playerHP}/{playerMaxHP}".PadRight(40) +
+        output += $"P{"".PadRight(50)}{enemy.Output}\n";
+        output += $"Player's Level: {player.Level}".PadRight(50) + $"{enemyName}'s Level: {enemyLevel}\n";
+        output += $"Player's HP: {playerHP}/{playerMaxHP}".PadRight(50) +
                   $"{enemyName}'s HP: {enemyHP}/{enemyMaxHP}\n";
 
         if (isBoss)
         {
             if (bossAI.IsAttackBlocked)
-                output += "\n\u26a0\ufe0f Boss has blocked your attack for 2 turns!\n";
+                output += "\n⚠️ Boss has blocked your attack for 2 turns!\n";
             if (bossAI.IsHealBlocked)
-                output += "\u26a0\ufe0f Boss has blocked your healing for 2 turns!\n";
+                output += "⚠️ Boss has blocked your healing for 2 turns!\n";
         }
 
         return output;
@@ -81,13 +91,13 @@ internal class Battle
     {
         if (isBoss && bossAI.IsAttackBlocked)
         {
-            OnMessage?.Invoke("\u274c Your attack is blocked!");
+            OnMessage?.Invoke("❌ Your attack is blocked!");
             return;
         }
 
         int damage = 50 + (player.Level - 1) * 10;
         enemyHP -= damage;
-        OnMessage?.Invoke($"\n\u2705 You dealt {damage} damage to the {enemyName.ToLower()}!");
+        OnMessage?.Invoke($"✅ You dealt {damage} damage to the {enemyName.ToLower()}!");
 
         if (isBoss) bossAI.OnPlayerAttack();
 
@@ -98,7 +108,7 @@ internal class Battle
     {
         if (isBoss && bossAI.IsHealBlocked)
         {
-            OnMessage?.Invoke("\u274c Your healing is blocked!");
+            OnMessage?.Invoke("❌ Your healing is blocked!");
             return;
         }
 
@@ -136,7 +146,7 @@ internal class Battle
         if (playerHP <= 0)
         {
             PlayerWon = false;
-            OnMessage?.Invoke("\u2620\ufe0f You have been defeated!");
+            OnMessage?.Invoke("☠️ You have been defeated!");
             EndBattle(false);
         }
     }
@@ -147,7 +157,7 @@ internal class Battle
         {
             if (isBoss)
             {
-                OnMessage?.Invoke("\ud83c\udf89 Congratulations! You defeated the boss!");
+                OnMessage?.Invoke("🎉 Congratulations! You defeated the boss!");
                 OnBossDefeated?.Invoke();
                 game.SetBossDefeated();
                 EndBattle(true);
@@ -155,7 +165,11 @@ internal class Battle
             }
 
             OnMessage?.Invoke($"You defeated the {enemyName.ToLower()}!");
-            enemy.Output = ".";
+
+            game.CurrentMap[player.Y, player.X] = new EmptyTile();
+
+            player.SetPosition(enemyX, enemyY);
+            game.CurrentMap[enemyY, enemyX] = player;
 
             player.WinsSinceLastLevel++;
             if (player.WinsSinceLastLevel >= player.Level)
