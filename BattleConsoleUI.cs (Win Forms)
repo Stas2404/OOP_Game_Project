@@ -1,0 +1,12 @@
+namespace WinFormsApp.Stubs
+{
+    public class BattleConsoleUI
+    {
+        public BattleConsoleUI(Battle battle, IGameUI ui) { }
+
+        public void Run()
+        {
+            throw new NotImplementedException("This class is only present for compilation. It shouldn't be used in WinForms.");
+        }
+    }
+}
