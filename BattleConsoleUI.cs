@@ -1,28 +1,30 @@
 using System;
 
-internal class BattleConsoleUI
+public class BattleConsoleUI
 {
-    private Battle battle;
+    private readonly Battle battle;
+    private readonly IGameUI ui;
     private bool inBattle = true;
 
-    public BattleConsoleUI(Battle battle)
+    public BattleConsoleUI(Battle battle, IGameUI ui)
     {
         this.battle = battle;
+        this.ui = ui;
 
         battle.OnMessage += ShowMessage;
         battle.OnBattleEnd += EndBattle;
-        battle.OnBossDefeated += HandleBossDefeated; 
+        battle.OnBossDefeated += HandleBossDefeated;
     }
 
     public void Run()
     {
         while (inBattle)
         {
-            Console.Clear();
-            Console.WriteLine(battle.GetFormattedState());
+            ui.Clear();
+            ui.WriteLine(battle.GetFormattedState());
+            ui.WriteLine("\n1. Attack\n2. Heal" + (battle.CanMercy ? "\n3. Mercy" : ""));
 
-            Console.WriteLine("\n1. Attack\n2. Heal" + (battle.CanMercy ? "\n3. Mercy" : ""));
-            ConsoleKey key = Console.ReadKey().Key;
+            ConsoleKey key = ui.ReadKey();
 
             bool playerActed = false;
 
@@ -44,11 +46,11 @@ internal class BattleConsoleUI
                     }
                     else
                     {
-                        Console.WriteLine("\n❌ Mercy is not allowed.");
+                        ui.WriteLine("\n❌ Mercy is not allowed.");
                     }
                     break;
                 default:
-                    Console.WriteLine("\n❌ Invalid input. Use keys 1, 2" + (battle.CanMercy ? " or 3" : "") + ".");
+                    ui.WriteLine("\n❌ Invalid input. Use keys 1, 2" + (battle.CanMercy ? " or 3" : "") + ".");
                     break;
             }
 
@@ -59,40 +61,40 @@ internal class BattleConsoleUI
 
             if (inBattle)
             {
-                Console.WriteLine("\nPress any key for next round...");
-                Console.ReadKey();
+                ui.WriteLine("\nPress any key for next round...");
+                ui.WaitForKey();
             }
         }
     }
 
-
     private void ShowMessage(string message)
     {
-        Console.WriteLine(message);
+        ui.WriteLine(message);
     }
 
     private void EndBattle()
     {
         inBattle = false;
     }
+
     private void HandleBossDefeated()
     {
-        Console.WriteLine("Press any key to finish the game, 'B' — to create custom level.");
-        var key = Console.ReadKey(true);
+        ui.WriteLine("Press any key to finish the game, 'B' — to create custom level.");
+        var key = ui.ReadKey();
 
-        if (key.Key == ConsoleKey.B)
+        if (key == ConsoleKey.B)
         {
-            LevelEditor editor = new LevelEditor();
-            editor.Start();
-            Console.ReadKey();
+            var editor = new LevelEditor(ui);
+            var editorUI = new LevelEditorConsoleUI(editor, ui);
+            editorUI.Run();
 
-            Game game = new Game();
-            game.Menu();
+            var menu = new GameConsoleUI(ui);
+
         }
         else
         {
-            Game game = new Game();
-            game.Menu();
+            var menu = new GameConsoleUI(ui);
+
         }
     }
 }
