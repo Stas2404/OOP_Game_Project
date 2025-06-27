@@ -1,0 +1,319 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Text;
+using System.IO;
+using System.Windows.Forms;
+
+namespace MenuUI
+{
+    public partial class Main : Form
+    {
+        private PrivateFontCollection pfc = new PrivateFontCollection();
+
+        private Game game;
+        private IGameUI ui;
+        private Map map;
+        private Battle? currentBattle;
+        private bool bossDefeated = false;
+        private bool isCustomLevel = false;
+        private MainMenu mainForm;
+
+        public bool ShouldLoadCustomLevel { get; set; } = false;
+        public bool VictoryExit { get; private set; } = false;
+
+
+        private enum BattleStep { WaitingAction, PlayerActionDone, EnemyActionDone }
+        private BattleStep currentStep = BattleStep.WaitingAction;
+
+
+        private readonly Dictionary<Keys, (int dx, int dy)> moveMap = new()
+        {
+            [Keys.W] = (0, -1),
+            [Keys.S] = (0, 1),
+            [Keys.A] = (-1, 0),
+            [Keys.D] = (1, 0)
+        };
+
+        public Main(MainMenu mainForm)
+        {
+            InitializeComponent();
+            LoadCustomFont();
+            this.KeyPreview = true;
+            this.mainForm = mainForm;
+
+            infoLabel.Visible = false;
+        }
+        private void LoadCustomFont()
+        {
+            string fontPath = Path.Combine(Application.StartupPath, "PressStart2P-Regular.ttf");
+            if (File.Exists(fontPath))
+            {
+                pfc.AddFontFile(fontPath);
+                Font myFont1 = new Font(pfc.Families[0], 6f); // можеш змінити розмір за бажанням
+                lblEnemyStats.Font = myFont1;
+                lblPlayerStats.Font = myFont1;
+                messageLabel.Font = myFont1;
+                infoLabel.Font = myFont1;
+                battleLabel.Font = myFont1;
+            }
+            else
+            {
+                MessageBox.Show("Шрифт не знайдено за шляхом:\n" + fontPath);
+            }
+        }
+
+        public void AppendMessage(string message)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => AppendMessage(message)));
+                return;
+            }
+
+            if (currentBattle != null)
+            {
+                battleLabel.Visible = true;
+                battleLabel.Text += message + Environment.NewLine;
+            }
+            else
+            {
+                messageLabel.Visible = true;
+                messageLabel.Text += message + Environment.NewLine;
+                messageTimer?.Stop();
+                messageTimer?.Start();
+            }
+        }
+
+        public void ClearPanel()
+        {
+            gamePanel.Invalidate();
+        }
+
+        private void DrawMap()
+        {
+            if (map == null)
+            {
+                MessageBox.Show("Map is null!");
+                return;
+            }
+            gamePanel.Invalidate();
+        }
+
+        private void gamePanel_Paint(object sender, PaintEventArgs e)
+        {
+            if (map == null) return;
+
+            const int cellSize = 30;
+            for (int y = 0; y < Map.Height; y++)
+            {
+                for (int x = 0; x < Map.Width; x++)
+                {
+                    var el = map.GetElement(x, y);
+                    e.Graphics.FillRectangle(new SolidBrush(el.Backcolor), x * cellSize, y * cellSize, cellSize, cellSize);
+                    e.Graphics.DrawString(el.Output, this.Font, new SolidBrush(el.Forecolor), x * cellSize, y * cellSize);
+                }
+            }
+
+            lblPlayerStats.Text = $"Player Lvl {map.player.Level}";
+            lblEnemyStats.Text = $"Game Lvl {map.GameLevel.LevelNumber}";
+        }
+
+        private void Main_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (currentBattle != null)
+            {
+                if (currentStep == BattleStep.PlayerActionDone)
+                {
+                    if (currentBattle != null)
+                    {
+                        battleLabel.Text = "";
+                        currentBattle.EnemyTurn();
+
+                        if (currentBattle != null)
+                        {
+                            AppendMessage(currentBattle.GetFormattedState());
+                            currentStep = BattleStep.EnemyActionDone;
+                            AppendMessage("➡ Press any key to continue...");
+                        }
+                    }
+                }
+                else if (currentStep == BattleStep.EnemyActionDone)
+                {
+                    if (currentBattle != null)
+                    {
+                        battleLabel.Text = "";
+                        AppendMessage(currentBattle.GetFormattedState());
+                        btnAttack.Enabled = true;
+                        btnHeal.Enabled = true;
+                        btnMercy.Enabled = currentBattle.CanMercy;
+                        currentStep = BattleStep.WaitingAction;
+                    }
+                }
+                return;
+            }
+
+            if (moveMap.TryGetValue(e.KeyCode, out var move))
+            {
+                map.player.MovePlayer(move.dx, move.dy);
+                DrawMap();
+            }
+            else if (e.KeyCode == Keys.F5)
+            {
+                GameSaver.Save(map, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "save.txt"));
+                AppendMessage("📂 The game was saved.");
+            }
+            else if (e.KeyCode == Keys.F6)
+            {
+                GameSaver.Load(map, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "save.txt"));
+                AppendMessage("📂 The gaming was loaded.");
+                DrawMap();
+            }
+        }
+
+        private void ToggleBattleButtons(bool visible)
+        {
+            btnAttack.Visible = visible;
+            btnHeal.Visible = visible;
+            btnMercy.Visible = visible;
+
+            btnAttack.Enabled = visible;
+            btnHeal.Enabled = visible;
+            btnMercy.Enabled = visible;
+        }
+
+        public void ShowBattleUI(Battle battle)
+        {
+            currentBattle = battle;
+            currentStep = BattleStep.WaitingAction;
+            ToggleBattleButtons(true);
+            gamePanel.Visible = false;
+            battleLabel.Visible = true;
+            battleLabel.Text = " ";
+            AppendMessage(battle.GetFormattedState());
+            battle.OnMessage += AppendMessage;
+            AppendMessage($"⚔ Battle started against {battle.EnemyName} (Lv {battle.EnemyLevel})!");
+
+            battle.OnBattleEnd += () =>
+            {
+                SoundManager.StopBattleMusic();
+                ToggleBattleButtons(false);
+                battleLabel.Text = "";
+                battleLabel.Visible = false;
+                gamePanel.Visible = true;
+                currentStep = BattleStep.WaitingAction;
+                currentBattle = null;
+
+                if (!map.HasEnemiesLeft())
+                {
+                    if (isCustomLevel)
+                    {
+                        infoLabel.Text = "🎉 You completed the custom level! Returning to the main menu...";
+                        infoLabel.Visible = true;
+                        bossVictoryTimer.Start();
+
+                        Application.DoEvents();
+                    }
+                    else if (battle.EnemyName == "Boss" && battle.PlayerWon)
+                    {
+                        bossDefeated = true;
+                        infoLabel.Text = "🏆 You defeated the boss!\nReturning to the main menu...";
+                        infoLabel.Visible = true;
+                        bossVictoryTimer.Start();
+                    }
+                }
+
+            };
+        }
+
+        private void bossVictoryTimer_Tick(object sender, EventArgs e)
+        {
+            bossVictoryTimer.Stop();
+
+            mainForm.Show();
+
+            mainForm.PlayMenuMusic();
+
+            this.Close();
+        }
+
+        private void btnAttack_Click(object sender, EventArgs e)
+        {
+            if (currentBattle == null || currentStep != BattleStep.WaitingAction) return;
+            battleLabel.Text = "";
+            currentBattle.PlayerAttack();
+            currentStep = BattleStep.PlayerActionDone;
+            DisableBattleButtons();
+            AppendMessage("\n➡ Press any key to continue...");
+        }
+
+        private void btnHeal_Click(object sender, EventArgs e)
+        {
+            if (currentBattle == null || currentStep != BattleStep.WaitingAction) return;
+            battleLabel.Text = "";
+            currentBattle.PlayerHeal();
+            currentStep = BattleStep.PlayerActionDone;
+            DisableBattleButtons();
+            AppendMessage("\n➡ Press any key to continue...");
+        }
+
+        private void btnMercy_Click(object sender, EventArgs e)
+        {
+            if (currentBattle == null || currentStep != BattleStep.WaitingAction) return;
+            battleLabel.Text = "";
+            currentBattle.PlayerMercy();
+            currentStep = BattleStep.PlayerActionDone;
+            DisableBattleButtons();
+        }
+
+        private void DisableBattleButtons()
+        {
+            btnAttack.Enabled = false;
+            btnHeal.Enabled = false;
+            btnMercy.Enabled = false;
+        }
+
+        private void messageTimer_Tick(object sender, EventArgs e)
+        {
+            messageLabel.Text = "";
+            messageTimer.Stop();
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+
+            ui = new WinFormsGameUI(this);
+            game = new Game(ui, this);
+
+            if (ShouldLoadCustomLevel)
+            {
+                game.RunCustomLevel();  
+            }
+            else
+            {
+                game.Init();       
+            }
+
+            map = game.CurrentMap;
+            DrawMap();
+        }
+        public void ReturnToMainMenu()
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(ReturnToMainMenu));
+                return;
+            }
+
+            VictoryExit = true; 
+
+            mainForm.Show();
+            mainForm.PlayMenuMusic();
+
+            this.Close();
+        }
+
+
+    }
+}
