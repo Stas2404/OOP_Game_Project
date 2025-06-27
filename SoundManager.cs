@@ -10,6 +10,8 @@ internal static class SoundManager
     private static WaveOutEvent musicOutput;
     private static AudioFileReader musicReader;
 
+    public static event Action<string>? OnError;
+
     public static void PlayMoveSound()
     {
         try
@@ -23,7 +25,7 @@ internal static class SoundManager
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Sound error]: {ex.Message}");
+            RaiseError(ex.Message);
         }
     }
 
@@ -37,7 +39,7 @@ internal static class SoundManager
 
             if (!File.Exists(path))
             {
-                Console.WriteLine($"[Sound error]: Файл {path} не знайдено.");
+                RaiseError($"Файл {path} не знайдено.");
                 return;
             }
 
@@ -59,13 +61,13 @@ internal static class SoundManager
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[Loop restart error]: {ex.Message}");
+                    RaiseError(ex.Message);
                 }
             };
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Sound error]: {ex.Message}");
+            RaiseError(ex.Message);
         }
     }
 
@@ -79,7 +81,7 @@ internal static class SoundManager
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Stop music error]: {ex.Message}");
+            RaiseError(ex.Message);
         }
         finally
         {
@@ -96,4 +98,9 @@ internal static class SoundManager
         moveSound = null;
         moveOutput = null;
     }
+    private static void RaiseError(string message)
+    {
+        OnError?.Invoke($"[Sound error]: {message}");
+    }
+
 }
