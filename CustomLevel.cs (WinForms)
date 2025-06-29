@@ -42,7 +42,7 @@ namespace MenuUI
             if (File.Exists(fontPath))
             {
                 pfc.AddFontFile(fontPath);
-                Font myFont = new Font(pfc.Families[0], 12f); // можеш змінити розмір за бажанням
+                Font myFont = new Font(pfc.Families[0], 12f);
                 chosenElem.Font = myFont;
             }
             else
