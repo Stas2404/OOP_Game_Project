@@ -50,7 +50,7 @@ namespace MenuUI
             if (File.Exists(fontPath))
             {
                 pfc.AddFontFile(fontPath);
-                Font myFont1 = new Font(pfc.Families[0], 6f); // можеш змінити розмір за бажанням
+                Font myFont1 = new Font(pfc.Families[0], 6f);
                 lblEnemyStats.Font = myFont1;
                 lblPlayerStats.Font = myFont1;
                 messageLabel.Font = myFont1;
@@ -313,7 +313,5 @@ namespace MenuUI
 
             this.Close();
         }
-
-
     }
 }
